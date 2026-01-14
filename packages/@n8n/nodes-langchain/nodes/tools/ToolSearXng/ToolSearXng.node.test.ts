@@ -40,7 +40,7 @@ describe('ToolSearXng', () => {
 			const node = new ToolSearXng();
 			const inputData: INodeExecutionData[] = [
 				{
-					json: { query: 'artificial intelligence' },
+					json: {},
 				},
 			];
 
@@ -48,7 +48,10 @@ describe('ToolSearXng', () => {
 				getInputData: jest.fn(() => inputData),
 				getNode: jest.fn(() => mock<INode>({ name: 'test searxng' })),
 				getCredentials: jest.fn().mockResolvedValue({ apiUrl: 'https://searx.example.com' }),
-				getNodeParameter: jest.fn().mockReturnValue({}),
+				getNodeParameter: jest.fn((paramName: string) => {
+					if (paramName === 'query') return 'artificial intelligence';
+					return {};
+				}),
 			});
 
 			// Mock the SearxngSearch.invoke method
@@ -69,27 +72,29 @@ describe('ToolSearXng', () => {
 					},
 				],
 			]);
-			expect(SearxngSearch.prototype.invoke).toHaveBeenCalledWith({
-				query: 'artificial intelligence',
-			});
+			expect(SearxngSearch.prototype.invoke).toHaveBeenCalledWith('artificial intelligence');
 		});
 
 		it('should handle multiple input items', async () => {
 			const node = new ToolSearXng();
 			const inputData: INodeExecutionData[] = [
 				{
-					json: { query: 'machine learning' },
+					json: {},
 				},
 				{
-					json: { query: 'deep learning' },
+					json: {},
 				},
 			];
 
+			const queries = ['machine learning', 'deep learning'];
 			const mockExecute = mock<IExecuteFunctions>({
 				getInputData: jest.fn(() => inputData),
 				getNode: jest.fn(() => mock<INode>({ name: 'test searxng' })),
 				getCredentials: jest.fn().mockResolvedValue({ apiUrl: 'https://searx.example.com' }),
-				getNodeParameter: jest.fn().mockReturnValue({}),
+				getNodeParameter: jest.fn((paramName: string, itemIndex: number) => {
+					if (paramName === 'query') return queries[itemIndex];
+					return {};
+				}),
 			});
 
 			// Mock the SearxngSearch.invoke method
@@ -127,7 +132,7 @@ describe('ToolSearXng', () => {
 			const node = new ToolSearXng();
 			const inputData: INodeExecutionData[] = [
 				{
-					json: { query: 'test query' },
+					json: {},
 				},
 			];
 
@@ -136,7 +141,11 @@ describe('ToolSearXng', () => {
 				getInputData: jest.fn(() => inputData),
 				getNode: jest.fn(() => mock<INode>({ name: 'test searxng' })),
 				getCredentials: jest.fn().mockResolvedValue({ apiUrl: 'https://searx.test.com' }),
-				getNodeParameter: jest.fn().mockReturnValue(testOptions),
+				getNodeParameter: jest.fn((paramName: string) => {
+					if (paramName === 'query') return 'test query';
+					if (paramName === 'options') return testOptions;
+					return {};
+				}),
 			});
 
 			SearxngSearch.prototype.invoke = jest.fn().mockResolvedValue('test result');
@@ -144,7 +153,29 @@ describe('ToolSearXng', () => {
 			await node.execute.call(mockExecute);
 
 			expect(mockExecute.getCredentials).toHaveBeenCalledWith('searXngApi');
+			expect(mockExecute.getNodeParameter).toHaveBeenCalledWith('query', 0);
 			expect(mockExecute.getNodeParameter).toHaveBeenCalledWith('options', 0);
+		});
+
+		it('should throw error when query is empty', async () => {
+			const node = new ToolSearXng();
+			const inputData: INodeExecutionData[] = [
+				{
+					json: {},
+				},
+			];
+
+			const mockExecute = mock<IExecuteFunctions>({
+				getInputData: jest.fn(() => inputData),
+				getNode: jest.fn(() => mock<INode>({ name: 'test searxng' })),
+				getCredentials: jest.fn().mockResolvedValue({ apiUrl: 'https://searx.example.com' }),
+				getNodeParameter: jest.fn((paramName: string) => {
+					if (paramName === 'query') return '';
+					return {};
+				}),
+			});
+
+			await expect(node.execute.call(mockExecute)).rejects.toThrow('Query parameter is required');
 		});
 	});
 });
