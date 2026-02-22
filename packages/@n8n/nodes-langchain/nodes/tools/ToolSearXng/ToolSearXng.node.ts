@@ -1,5 +1,5 @@
 import { SearxngSearch } from '@langchain/community/tools/searxng_search';
-import { NodeConnectionTypes } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import type {
 	IExecuteFunctions,
 	INodeExecutionData,
@@ -30,6 +30,16 @@ async function getTool(ctx: ISupplyDataFunctions | IExecuteFunctions, itemIndex:
 		},
 		params: options,
 	});
+}
+
+function getQuery(ctx: IExecuteFunctions, itemIndex: number): string {
+	const query = ctx.getNodeParameter('query', itemIndex) as string;
+	if (!query) {
+		throw new NodeOperationError(ctx.getNode(), 'Query parameter is required', {
+			itemIndex,
+		});
+	}
+	return query;
 }
 
 export class ToolSearXng implements INodeType {
@@ -68,6 +78,14 @@ export class ToolSearXng implements INodeType {
 		],
 		properties: [
 			getConnectionHintNoticeField([NodeConnectionTypes.AiAgent]),
+			{
+				displayName: 'Query',
+				name: 'query',
+				type: 'string',
+				default: '',
+				required: true,
+				description: 'The search query to execute',
+			},
 			{
 				displayName: 'Options',
 				name: 'options',
@@ -131,11 +149,11 @@ export class ToolSearXng implements INodeType {
 		const result: INodeExecutionData[] = [];
 		const input = this.getInputData();
 		for (let i = 0; i < input.length; i++) {
-			const item = input[i];
+			const query = getQuery(this, i);
 			const tool = await getTool(this, i);
 			result.push({
 				json: {
-					response: await tool.invoke(item.json),
+					response: await tool.invoke(query),
 				},
 				pairedItem: {
 					item: i,
